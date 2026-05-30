@@ -58,4 +58,4 @@ python frontend.py
 - frontend.py: Manages the customtkinter lifecycle, UI states, and threaded execution of backend tasks.
 - requirements.txt: List of necessary libraries including huggingface_hub and transformers.
 
-## Please Note: prompt & model matching system is still in development, so try to use model names close to those actually available at HF. 
+Please Note: prompt & model matching system is still in development, so try to use in your prompt model names close to those actually available at HF. 
