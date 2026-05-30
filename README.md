@@ -58,4 +58,4 @@ python frontend.py
 - frontend.py: Manages the customtkinter lifecycle, UI states, and threaded execution of backend tasks.
 - requirements.txt: List of necessary libraries including huggingface_hub and transformers.
 
-## Please Note: prompt & model matching system is still in development, so try to use model names close to those actually available at HF. 
+Please Note: prompt & model matching system is still in development, so try to use in your prompt model names close to those actually available at HF. In addition, the model list is limited to 10000 items to reduce fetching time and prevent API quota limitation errors, and to reduce search time. Try prompts such as "What can you tell me about [model name]?", "What are the most significant features of [model name]"? "Is there such a model as [model name]? etc.
