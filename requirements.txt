@@ -2,3 +2,4 @@ customtkinter
 huggingface_hub
 transformers
 torch
+accelerate
