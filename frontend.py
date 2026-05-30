@@ -64,18 +64,21 @@ class App(ctk.CTk):
         best_match = backend.find_best_model(prompt)
         
         if not best_match:
-            self.update_display(self.textbox_output, "No relevant model metadata found. Please try a different query.\n")
-            self.btn_generate.configure(state="normal")
-            return
-
-        metadata = backend.get_model_metadata(best_match)
-        
-        header = (
-            f"--- SOURCE METADATA ---\n"
-            f"ID: {metadata['full_name']}\n"
-            f"-----------------------\n\n"
-        )
-        self.update_display(self.textbox_output, header)
+            header = (
+                f"--- NO MATCH FOUND ---\n"
+                f"Proceeding without database context...\n"
+                f"-----------------------\n\n"
+            )
+            self.update_display(self.textbox_output, header)
+            metadata = None
+        else:
+            metadata = backend.get_model_metadata(best_match)
+            header = (
+                f"--- SOURCE METADATA ---\n"
+                f"ID: {metadata['full_name']}\n"
+                f"-----------------------\n\n"
+            )
+            self.update_display(self.textbox_output, header)
 
         # Streaming RAG response
         for chunk in backend.generate_answer_stream(prompt, metadata):

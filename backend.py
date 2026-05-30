@@ -9,11 +9,15 @@ tokenizer = None
 model = None
 model_list = []
 
+# Constraints for matching
+MIN_WORD_LEN = 2
+JACCARD_THRESHOLD = 0.05
+
 def get_initial_data():
     """Fetch initial model list from HF."""
     global model_list
     api = HfApi()
-    models = api.list_models(limit=10000)
+    models = api.list_models(limit=500)
     model_list = [model.modelId for model in models]
     return len(model_list)
 
@@ -28,20 +32,41 @@ def load_local_model():
     )
 
 def find_best_model(prompt: str):
-    """Find the model that matches the most prompt words from pre-fetched list."""
-    prompt_words = set(prompt.lower().split())
+    """Find the best matching model using Jaccard Similarity and minimum word length."""
+    # Filter prompt words: keep only alphanumeric words with len >= MIN_WORD_LEN
+    prompt_words = {
+        word.lower() for word in prompt.replace("/", " ").replace("-", " ").replace("_", " ").split()
+        if len(word) >= MIN_WORD_LEN and word.isalnum()
+    }
+    
+    if not prompt_words:
+        return None
+
     best_model = None
-    max_matches = 0
+    max_similarity = 0.0
 
     for model_id in model_list:
-        model_name_parts = set(model_id.lower().replace("/", " ").replace("-", " ").split())
-        matches = len(prompt_words.intersection(model_name_parts))
+        # Normalize model parts
+        model_parts = {
+            part.lower() for part in model_id.replace("/", " ").replace("-", " ").replace("_", " ").split()
+            if len(part) >= MIN_WORD_LEN and part.isalnum()
+        }
         
-        if matches > max_matches:
-            max_matches = matches
-            best_model = model_id
+        if not model_parts:
+            continue
             
-    return best_model
+        # Jaccard Similarity: intersection over union
+        intersection = prompt_words.intersection(model_parts)
+        union = prompt_words.union(model_parts)
+        similarity = len(intersection) / len(union) if union else 0.0
+        
+        if similarity > max_similarity:
+            max_similarity = similarity
+            best_model = model_id
+
+    if max_similarity >= JACCARD_THRESHOLD:
+        return best_model
+    return None
 
 def get_model_metadata(model_id: str):
     """Fetch specific metadata for a given model ID."""
@@ -66,20 +91,23 @@ def get_model_metadata(model_id: str):
         "safetensors_size_gb": round(size_gb, 2)
     }
 
-def generate_answer_stream(user_prompt: str, metadata: dict):
+def generate_answer_stream(user_prompt: str, metadata: dict = None):
     """Generate a response using augmented prompt with specific instructions."""
     
-    metadata_text = (
-        f"- Full Name: {metadata['full_name']}\n"
-        f"- Primary Purpose: {metadata['purpose']}\n"
-        f"- Required Library: {metadata['library']}\n"
-        f"- Base Model: {metadata['base_model']}\n"
-        f"- Total Weight Size: {metadata['safetensors_size_gb']} GB"
-    )
+    if metadata:
+        metadata_text = (
+            f"- Full Name: {metadata['full_name']}\n"
+            f"- Primary Purpose: {metadata['purpose']}\n"
+            f"- Required Library: {metadata['library']}\n"
+            f"- Base Model: {metadata['base_model']}\n"
+            f"- Total Weight Size: {metadata['safetensors_size_gb']} GB"
+        )
+    else:
+        metadata_text = "No data in the database."
     
     full_prompt = (
         f"Answer shortly to the prompt query and then proceed to more detailed, "
-        f"but concise discussion of the following database items (explain each of those items in two-three sentences):\n\n"
+        f"but concise discussion of the following database items (couple of sentences each):\n\n"
         f"{metadata_text}\n\n"
         f"Prompt Query: {user_prompt}"
     )
