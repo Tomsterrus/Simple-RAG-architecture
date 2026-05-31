@@ -1,3 +1,4 @@
+import re
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from huggingface_hub import HfApi, model_info
@@ -9,17 +10,27 @@ tokenizer = None
 model = None
 model_list = []
 
-# Constraints for matching (loosened)
+# Constraints for matching
 MIN_WORD_LEN = 2
 MATCH_THRESHOLD = 0.25  # At least 25% of filtered prompt words must match the model ID
 
+# Set of common English conversational filler words to ignore during matching
+STOPWORDS = {
+    "what", "do", "you", "know", "about", "tell", "me", "show", "find", "get", 
+    "search", "for", "please", "give", "information", "on", "is", "are", "the", 
+    "a", "an", "and", "or", "of", "in", "to", "with", "how", "can", "could", 
+    "would", "any", "some", "who", "which", "there", "here", "this", "that"
+}
+
 def get_initial_data():
-    """Fetch initial model list from HF, sorted by downloads to ensure popular models are present."""
+    """Fetch initial model list from HF, sorted by downloads, then sorted alphabetically locally."""
     global model_list
     api = HfApi()
-    # Sort by downloads descending to guarantee we get known models like Llama, BERT, Whisper, etc.
+    # Fetch top 1000 models by downloads (without the deprecated direction parameter)
     models = api.list_models(sort="downloads", limit=1000)
-    model_list = [model.modelId for model in models]
+    
+    # Sort the retrieved list alphabetically for a better UI user experience
+    model_list = sorted([model.modelId for model in models], key=lambda x: x.lower())
     return len(model_list)
 
 def get_loaded_models():
@@ -37,11 +48,17 @@ def load_local_model():
     )
 
 def find_best_model(prompt: str):
-    """Find the best matching model using Overlap Coefficient and minimum word length."""
-    # Filter prompt words: keep only alphanumeric words with len >= MIN_WORD_LEN
+    """Find the best matching model using Overlap Coefficient, ignoring stopwords and stripping punctuation."""
+    # Strip punctuation but keep alphanumeric characters, hyphens, underscores and slashes
+    cleaned_prompt = re.sub(r'[^\w\s\-\/_]', ' ', prompt.lower())
+    
+    # Split by common separators used in model naming
+    raw_words = cleaned_prompt.replace("/", " ").replace("-", " ").replace("_", " ").split()
+    
+    # Filter out stopwords and words shorter than MIN_WORD_LEN
     prompt_words = {
-        word.lower() for word in prompt.replace("/", " ").replace("-", " ").replace("_", " ").split()
-        if len(word) >= MIN_WORD_LEN and word.isalnum()
+        word for word in raw_words
+        if len(word) >= MIN_WORD_LEN and word.isalnum() and word not in STOPWORDS
     }
     
     if not prompt_words:
