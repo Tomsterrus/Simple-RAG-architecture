@@ -12,9 +12,9 @@ model_list = []
 
 # Constraints for matching
 MIN_WORD_LEN = 2
-MATCH_THRESHOLD = 0.25  # At least 25% of filtered prompt words must match the model ID
+MATCH_THRESHOLD = 0.25  # Minimum weighted similarity required to accept a match
 
-# Set of common English conversational filler words to ignore (keeps size modifiers active)
+# Set of common English conversational filler words to ignore completely
 STOPWORDS = {
     "what", "do", "you", "know", "about", "tell", "me", "show", "find", "get", 
     "search", "for", "please", "give", "information", "on", "is", "are", "the", 
@@ -23,7 +23,7 @@ STOPWORDS = {
 }
 
 def get_initial_data():
-    """Fetch initial model list from HF, sorted by downloads, then sorted alphabetically locally."""
+    """Fetch initial model list from HF, sorted by downloads."""
     global model_list
     api = HfApi()
     # Fetch top 1000 models by downloads (without the deprecated direction parameter)
@@ -48,7 +48,9 @@ def load_local_model():
     )
 
 def find_best_model(prompt: str):
-    """Find the best matching model using substring overlap coefficient, ignoring conversational stopwords."""
+    """Find the best matching model using dynamic weighted substring matching to prevent false positives."""
+    global model_list
+    
     # Strip punctuation but keep alphanumeric characters, hyphens, underscores and slashes
     cleaned_prompt = re.sub(r'[^\w\s\-\/_]', ' ', prompt.lower())
     
@@ -64,15 +66,29 @@ def find_best_model(prompt: str):
     if not prompt_words:
         return None
 
+    # Dynamically calculate weights based on substring frequency across the model list.
+    # Words that often appear as substrings (like 'llm2', '3b') get very low weight.
+    # Completely unique/unseen search terms (like 'gummy', 'bear') get a default high weight of 1.0.
+    prompt_weights = {}
+    total_prompt_weight = 0.0
+    for word in prompt_words:
+        freq = sum(1 for model_id in model_list if word in model_id.lower())
+        weight = 1.0 / freq if freq > 0 else 1.0
+        prompt_weights[word] = weight
+        total_prompt_weight += weight
+
     best_model = None
     max_similarity = 0.0
 
     for model_id in model_list:
         model_id_lower = model_id.lower()
         
-        # Calculate how many of the prompt words exist as substrings inside the model ID
-        matches = sum(1 for word in prompt_words if word in model_id_lower)
-        similarity = matches / len(prompt_words) if prompt_words else 0.0
+        # Calculate the sum of weights of the prompt words that match the model ID as substrings
+        matched_weight = sum(
+            prompt_weights[word] for word in prompt_words if word in model_id_lower
+        )
+        
+        similarity = matched_weight / total_prompt_weight if total_prompt_weight > 0 else 0.0
         
         if similarity > max_similarity:
             max_similarity = similarity
