@@ -11,6 +11,7 @@ A lightweight desktop GUI demonstrating a Retrieval-Augmented Generation (RAG) w
   - Base Model Lineage
   - Total Weight Size (Safetensors)
 - Local Inference: Powered by the Qwen2.5-1.5B-Instruct model, allowing for private, local text generation without external LLM API costs.
+- Interactive Model Directory: Displays a scrollable, alphabetically sorted directory of the top 1000 most downloaded Hugging Face models directly in the UI, allowing users to easily browse and copy valid model names to test the RAG matching engine.
 - Asynchronous Initialization: Features a background loading system with a progress bar to initialize the 500-model database and the local LLM without freezing the UI.
 - Real-time Streaming: Implements TextIteratorStreamer for token-by-token response rendering.
 - Decoupled Architecture: Clean separation between the customtkinter frontend and the transformers/huggingface_hub backend.
