@@ -6,7 +6,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Simple RAG Architecture")
-        self.geometry("1100x750")
+        self.geometry("800x650")
 
         # Loading UI
         self.label_loading = ctk.CTkLabel(self, text="Initializing System (HF API & Local LLM)...")
@@ -102,6 +102,10 @@ class App(ctk.CTk):
             header = (
                 f"--- SOURCE METADATA ---\n"
                 f"ID: {metadata['full_name']}\n"
+                f"Purpose: {metadata['purpose']}\n"
+                f"Library: {metadata['library']}\n"
+                f"Base Model: {metadata['base_model']}\n"
+                f"Weight Size: {metadata['safetensors_size_gb']} GB\n"
                 f"-----------------------\n\n"
             )
             self.update_display(self.textbox_output, header)
