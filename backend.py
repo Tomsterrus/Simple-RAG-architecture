@@ -48,7 +48,7 @@ def load_local_model():
     )
 
 def find_best_model(prompt: str):
-    """Find the best matching model using Overlap Coefficient, ignoring stopwords and stripping punctuation."""
+    """Find the best matching model using Overlap Coefficient and minimum word length."""
     # Strip punctuation but keep alphanumeric characters, hyphens, underscores and slashes
     cleaned_prompt = re.sub(r'[^\w\s\-\/_]', ' ', prompt.lower())
     
@@ -113,28 +113,39 @@ def get_model_metadata(model_id: str):
     }
 
 def generate_answer_stream(user_prompt: str, metadata: dict = None):
-    """Generate a response using augmented prompt with specific instructions."""
+    """Generate a response using augmented prompt with strict instructions to avoid hallucinations."""
     
     if metadata:
-        metadata_text = (
+        context_knowledge = (
+            f"Context: The model '{metadata['full_name']}' is available on Hugging Face.\n"
+            f"Here are the official technical specifications retrieved from the Hugging Face database:\n"
             f"- Full Name: {metadata['full_name']}\n"
             f"- Primary Purpose: {metadata['purpose']}\n"
             f"- Required Library: {metadata['library']}\n"
             f"- Base Model: {metadata['base_model']}\n"
             f"- Total Weight Size: {metadata['safetensors_size_gb']} GB"
         )
+        
+        full_prompt = (
+            f"{context_knowledge}\n\n"
+            f"Instructions:\n"
+            f"1. Answer the user prompt shortly based ONLY on the context provided above.\n"
+            f"2. Explicitly state in your answer that this model is available on Hugging Face.\n"
+            f"3. Briefly discuss the provided technical specs (name, purpose, library, base model, size) in a couple of concise sentences.\n"
+            f"4. Strictly avoid hallucinating, guessing, or making up any biographical, academic, or other external facts about the author or the model that are not listed in the context above.\n\n"
+            f"Prompt Query: {user_prompt}"
+        )
     else:
-        metadata_text = "No data in the database."
-    
-    full_prompt = (
-        f"Answer shortly to the prompt query and then proceed to more detailed, "
-        f"but concise discussion of the following database items (couple of sentences each):\n\n"
-        f"{metadata_text}\n\n"
-        f"Prompt Query: {user_prompt}"
-    )
+        full_prompt = (
+            f"Context: No data in the database.\n\n"
+            f"Instructions:\n"
+            f"1. Answer shortly to the prompt query.\n"
+            f"2. State that no matching database entry was found.\n\n"
+            f"Prompt Query: {user_prompt}"
+        )
     
     messages = [
-        {"role": "system", "content": "You are a helpful assistant providing information about AI models."},
+        {"role": "system", "content": "You are a precise assistant providing information about AI models using ONLY provided facts. You do not hallucinate details."},
         {"role": "user", "content": full_prompt}
     ]
     
