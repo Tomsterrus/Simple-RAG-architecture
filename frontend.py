@@ -6,11 +6,11 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Simple RAG Architecture")
-        self.geometry("800x750")
+        self.geometry("1100x750")
 
         # Loading UI
         self.label_loading = ctk.CTkLabel(self, text="Initializing System (HF API & Local LLM)...")
-        self.label_loading.pack(pady=(50, 5))
+        self.label_loading.pack(pady=(150, 5))
         
         self.progress_bar = ctk.CTkProgressBar(self, width=400)
         self.progress_bar.pack(pady=10)
@@ -19,20 +19,40 @@ class App(ctk.CTk):
         # Main UI (hidden initially)
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         
-        self.label_prompt = ctk.CTkLabel(self.main_frame, text="Enter your query:")
-        self.label_prompt.pack(pady=(10, 0), anchor="w", padx=50)
+        # Grid layout for main UI (2 columns: left is interaction, right is database list)
+        self.main_frame.grid_columnconfigure(0, weight=3)
+        self.main_frame.grid_columnconfigure(1, weight=2)
+        self.main_frame.grid_rowconfigure(0, weight=1)
+
+        # LEFT COLUMN (Interaction Frame)
+        self.left_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
+
+        self.label_prompt = ctk.CTkLabel(self.left_frame, text="Enter your query:")
+        self.label_prompt.pack(pady=(10, 0), anchor="w", padx=20)
         
-        self.textbox_prompt = ctk.CTkTextbox(self.main_frame, width=700, height=100)
+        self.textbox_prompt = ctk.CTkTextbox(self.left_frame, width=550, height=100)
         self.textbox_prompt.pack(pady=10)
 
-        self.btn_generate = ctk.CTkButton(self.main_frame, text="Generate RAG Answer", command=self.start_generation_thread)
+        self.btn_generate = ctk.CTkButton(self.left_frame, text="Generate RAG Answer", command=self.start_generation_thread)
         self.btn_generate.pack(pady=10)
 
-        self.label_output = ctk.CTkLabel(self.main_frame, text="Response:")
-        self.label_output.pack(pady=(10, 0), anchor="w", padx=50)
+        self.label_output = ctk.CTkLabel(self.left_frame, text="Response:")
+        self.label_output.pack(pady=(10, 0), anchor="w", padx=20)
         
-        self.textbox_output = ctk.CTkTextbox(self.main_frame, width=700, height=400)
+        self.textbox_output = ctk.CTkTextbox(self.left_frame, width=550, height=400)
         self.textbox_output.pack(pady=10)
+
+        # RIGHT COLUMN (Database Viewer Frame)
+        self.right_frame = ctk.CTkFrame(self.main_frame)
+        self.right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
+
+        self.label_db = ctk.CTkLabel(self.right_frame, text="Hugging Face Model Database (Top 1000 Downloads):", font=("Arial", 12, "bold"))
+        self.label_db.pack(pady=(15, 5))
+
+        # Read-only scrollable textbox to easily view and copy model names
+        self.textbox_db_list = ctk.CTkTextbox(self.right_frame, width=380, height=580)
+        self.textbox_db_list.pack(pady=10, padx=15, expand=True, fill="both")
 
         # Start loading background task
         threading.Thread(target=self.initialize_system, daemon=True).start()
@@ -44,10 +64,16 @@ class App(ctk.CTk):
         backend.load_local_model()
         self.progress_bar.set(1.0)
         
+        # Populate the database viewer textbox
+        models = backend.get_loaded_models()
+        db_text = "\n".join(models)
+        self.update_display(self.textbox_db_list, db_text)
+        self.textbox_db_list.configure(state="disabled") # Set to read-only
+
         # Switch to main UI
         self.label_loading.pack_forget()
         self.progress_bar.pack_forget()
-        self.main_frame.pack(expand=True, fill="both", padx=20, pady=20)
+        self.main_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
     def start_generation_thread(self):
         """Execute RAG process in a separate thread."""
@@ -87,6 +113,7 @@ class App(ctk.CTk):
         self.btn_generate.configure(state="normal")
 
     def update_display(self, widget, text):
+        widget.configure(state="normal")
         widget.delete("1.0", "end")
         widget.insert("1.0", text)
         widget.see("end")

@@ -9,17 +9,22 @@ tokenizer = None
 model = None
 model_list = []
 
-# Constraints for matching
+# Constraints for matching (loosened)
 MIN_WORD_LEN = 2
-JACCARD_THRESHOLD = 0.05
+MATCH_THRESHOLD = 0.25  # At least 25% of filtered prompt words must match the model ID
 
 def get_initial_data():
-    """Fetch initial model list from HF."""
+    """Fetch initial model list from HF, sorted by downloads to ensure popular models are present."""
     global model_list
     api = HfApi()
-    models = api.list_models(limit=500)
+    # Sort by downloads descending to guarantee we get known models like Llama, BERT, Whisper, etc.
+    models = api.list_models(sort="downloads", limit=1000)
     model_list = [model.modelId for model in models]
     return len(model_list)
+
+def get_loaded_models():
+    """Return the cached list of fetched models."""
+    return model_list
 
 def load_local_model():
     """Initialize the Qwen model and tokenizer."""
@@ -32,7 +37,7 @@ def load_local_model():
     )
 
 def find_best_model(prompt: str):
-    """Find the best matching model using Jaccard Similarity and minimum word length."""
+    """Find the best matching model using Overlap Coefficient and minimum word length."""
     # Filter prompt words: keep only alphanumeric words with len >= MIN_WORD_LEN
     prompt_words = {
         word.lower() for word in prompt.replace("/", " ").replace("-", " ").replace("_", " ").split()
@@ -55,16 +60,15 @@ def find_best_model(prompt: str):
         if not model_parts:
             continue
             
-        # Jaccard Similarity: intersection over union
+        # Overlap coefficient relative to prompt: intersection / total prompt words
         intersection = prompt_words.intersection(model_parts)
-        union = prompt_words.union(model_parts)
-        similarity = len(intersection) / len(union) if union else 0.0
+        similarity = len(intersection) / len(prompt_words) if prompt_words else 0.0
         
         if similarity > max_similarity:
             max_similarity = similarity
             best_model = model_id
 
-    if max_similarity >= JACCARD_THRESHOLD:
+    if max_similarity >= MATCH_THRESHOLD:
         return best_model
     return None
 
