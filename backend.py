@@ -14,7 +14,7 @@ model_list = []
 MIN_WORD_LEN = 2
 MATCH_THRESHOLD = 0.25  # At least 25% of filtered prompt words must match the model ID
 
-# Set of common English conversational filler words to ignore during matching
+# Set of common English conversational filler words to ignore (keeps size modifiers active)
 STOPWORDS = {
     "what", "do", "you", "know", "about", "tell", "me", "show", "find", "get", 
     "search", "for", "please", "give", "information", "on", "is", "are", "the", 
@@ -48,14 +48,14 @@ def load_local_model():
     )
 
 def find_best_model(prompt: str):
-    """Find the best matching model using Overlap Coefficient and minimum word length."""
+    """Find the best matching model using substring overlap coefficient, ignoring conversational stopwords."""
     # Strip punctuation but keep alphanumeric characters, hyphens, underscores and slashes
     cleaned_prompt = re.sub(r'[^\w\s\-\/_]', ' ', prompt.lower())
     
     # Split by common separators used in model naming
     raw_words = cleaned_prompt.replace("/", " ").replace("-", " ").replace("_", " ").split()
     
-    # Filter out stopwords and words shorter than MIN_WORD_LEN
+    # Filter out conversational stopwords and words shorter than MIN_WORD_LEN
     prompt_words = {
         word for word in raw_words
         if len(word) >= MIN_WORD_LEN and word.isalnum() and word not in STOPWORDS
@@ -68,22 +68,19 @@ def find_best_model(prompt: str):
     max_similarity = 0.0
 
     for model_id in model_list:
-        # Normalize model parts
-        model_parts = {
-            part.lower() for part in model_id.replace("/", " ").replace("-", " ").replace("_", " ").split()
-            if len(part) >= MIN_WORD_LEN and part.isalnum()
-        }
+        model_id_lower = model_id.lower()
         
-        if not model_parts:
-            continue
-            
-        # Overlap coefficient relative to prompt: intersection / total prompt words
-        intersection = prompt_words.intersection(model_parts)
-        similarity = len(intersection) / len(prompt_words) if prompt_words else 0.0
+        # Calculate how many of the prompt words exist as substrings inside the model ID
+        matches = sum(1 for word in prompt_words if word in model_id_lower)
+        similarity = matches / len(prompt_words) if prompt_words else 0.0
         
         if similarity > max_similarity:
             max_similarity = similarity
             best_model = model_id
+        elif similarity == max_similarity and similarity > 0:
+            # Tie-breaker: prefer the more specific/shorter model ID if similarities are equal
+            if best_model and len(model_id) < len(best_model):
+                best_model = model_id
 
     if max_similarity >= MATCH_THRESHOLD:
         return best_model
